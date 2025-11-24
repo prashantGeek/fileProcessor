@@ -5,9 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node --max-old-space-size=4096 src/server.js",
-    "dev": "nodemon --max-old-space-size=4096 src/server.js",
-    "test": "jest --coverage",
-    "lint": "eslint src/**/*.js"
+    "dev": "nodemon --max-old-space-size=4096 src/server.js"
   },
   "keywords": ["file-processing", "s3", "mongodb", "job-queue"],
   "author": "",
@@ -27,9 +25,7 @@
     "joi": "^17.11.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.2",
-    "eslint": "^8.54.0",
-    "jest": "^29.7.0"
+    "nodemon": "^3.0.2"
   },
   "engines": {
     "node": ">=18.0.0"
