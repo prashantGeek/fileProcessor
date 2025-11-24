@@ -19,8 +19,19 @@ const api = axios.create({
 });
 
 const handleError = (error: AxiosError<any>) => {
+  // Log the full error for debugging
+  console.error('API Error Details:', {
+    status: error.response?.status,
+    data: error.response?.data,
+    message: error.message
+  });
+
   if (error.response) {
-    throw new Error(error.response.data.error || error.response.data.message || 'API Error');
+    const errorMsg = error.response.data?.error || 
+                     error.response.data?.message || 
+                     JSON.stringify(error.response.data) ||
+                     'API Error';
+    throw new Error(errorMsg);
   } else if (error.request) {
     throw new Error('No response from server. Please check if backend is running.');
   } else {
@@ -28,7 +39,8 @@ const handleError = (error: AxiosError<any>) => {
   }
 };
 
-// File Operations
+// ================== File Operations ==================
+
 export const uploadFile = async (file: globalThis.File): Promise<File> => {
   try {
     const formData = new FormData();
@@ -100,7 +112,8 @@ export const getFileData = async (
   }
 };
 
-// Job Operations
+// ================== Job Operations ==================
+
 export const processFile = async (fileId: string, priority: number = 0): Promise<Job> => {
   try {
     const response = await api.post<ApiResponse<Job>>(`/process/${fileId}`, { priority });
