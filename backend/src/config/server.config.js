@@ -2,7 +2,7 @@ require('dotenv').config();
 
 module.exports = {
   env: process.env.NODE_ENV || 'development',
-  port: parseInt(process.env.PORT, 10) || 3001,
+  port: parseInt(process.env.PORT, 10) || 10000,
   host: process.env.HOST || '0.0.0.0',
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   

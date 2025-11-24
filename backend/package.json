@@ -4,7 +4,7 @@
   "description": "Production-level file processing backend with job queue",
   "main": "src/server.js",
   "scripts": {
-    "start": "node --max-old-space-size=4096 src/server.js",
+    "start": "node --max-old-space-size=512 src/server.js",
     "dev": "nodemon --max-old-space-size=4096 src/server.js"
   },
   "keywords": ["file-processing", "s3", "mongodb", "job-queue"],
@@ -28,6 +28,6 @@
     "nodemon": "^3.0.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.x"
   }
 }
