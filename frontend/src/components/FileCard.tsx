@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { File as FileType } from '@/types';
 import { FileText, Trash2, Play, Eye } from 'lucide-react';
 import { formatBytes, formatDate } from '@/lib/utils';
 import ProcessingStatus from './ProcessingStatus';
-import { processFile, deleteFile } from '@/services/api';
+import { processFile, deleteFile, getFile } from '@/services/api';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 
@@ -17,17 +17,66 @@ interface FileCardProps {
 export default function FileCard({ file, onUpdate }: FileCardProps) {
   const [processing, setProcessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [localFile, setLocalFile] = useState(file);
+  const isProcessingRef = useRef(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Only update localFile from props if we're not actively processing
+    if (!isProcessingRef.current) {
+      setLocalFile(file);
+    }
+  }, [file]);
+
+  // Poll for status updates when processing
+  useEffect(() => {
+    if (localFile.status !== 'processing') {
+      isProcessingRef.current = false;
+      return;
+    }
+
+    isProcessingRef.current = true;
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const updatedFile = await getFile(localFile.fileId);
+        setLocalFile(updatedFile);
+        
+        if (updatedFile.status === 'processed') {
+          toast.success('File processed successfully!');
+          isProcessingRef.current = false;
+          if (onUpdate) onUpdate();
+          clearInterval(pollInterval);
+        } else if (updatedFile.status === 'failed') {
+          toast.error('File processing failed');
+          isProcessingRef.current = false;
+          if (onUpdate) onUpdate();
+          clearInterval(pollInterval);
+        }
+      } catch (error) {
+        console.error('Failed to poll file status:', error);
+      }
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [localFile.status, localFile.fileId, onUpdate]);
 
   const handleProcess = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setProcessing(true);
+    isProcessingRef.current = true;
+    
+    // Optimistically update local state
+    setLocalFile({ ...localFile, status: 'processing' });
+    
     try {
       const job = await processFile(file.fileId);
       toast.success(`Processing started! Job ID: ${job.jobId}`);
-      if (onUpdate) onUpdate();
+      // Don't call onUpdate here - let the polling handle it
     } catch (error: any) {
       toast.error(error.message || 'Failed to start processing');
+      setLocalFile(file); // Revert on error
+      isProcessingRef.current = false;
     } finally {
       setProcessing(false);
     }
@@ -62,17 +111,17 @@ export default function FileCard({ file, onUpdate }: FileCardProps) {
         <div className="flex items-start space-x-3 flex-1 min-w-0">
           <FileText className="w-8 h-8 text-blue-500 flex-shrink-0 mt-1" />
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-gray-900 truncate">{file.originalName}</h3>
+            <h3 className="font-medium text-gray-900 truncate">{localFile.originalName}</h3>
             <div className="flex items-center space-x-2 mt-1">
-              <ProcessingStatus status={file.status} />
-              <span className="text-sm text-gray-500">{formatBytes(file.fileSize)}</span>
+              <ProcessingStatus status={localFile.status} />
+              <span className="text-sm text-gray-500">{formatBytes(localFile.fileSize)}</span>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              Uploaded: {formatDate(file.uploadedAt)}
+              Uploaded: {formatDate(localFile.uploadedAt)}
             </p>
-            {file.processedAt && (
+            {localFile.processedAt && (
               <p className="text-xs text-gray-500">
-                Processed: {formatDate(file.processedAt)}
+                Processed: {formatDate(localFile.processedAt)}
               </p>
             )}
           </div>
@@ -87,7 +136,7 @@ export default function FileCard({ file, onUpdate }: FileCardProps) {
             <Eye className="w-4 h-4" />
           </button>
 
-          {file.status === 'uploaded' && (
+          {localFile.status === 'uploaded' && !processing && !isProcessingRef.current && (
             <button
               onClick={handleProcess}
               disabled={processing}

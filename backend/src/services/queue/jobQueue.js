@@ -106,15 +106,13 @@ class JobQueue extends EventEmitter {
         return;
       }
 
-      // Get next pending job with highest priority
-      const job = await Job.findOne({ 
-        status: 'pending' 
-      })
-      .sort({ priority: -1, createdAt: 1 })
-      .exec();
+      // Find next pending job (highest priority first)
+      const job = await Job.findOne({ status: 'pending' })
+        .sort({ priority: -1, createdAt: 1 })
+        .exec();
 
       if (!job) {
-        return;
+        return; // No pending jobs
       }
 
       // Mark as processing
@@ -122,19 +120,17 @@ class JobQueue extends EventEmitter {
       job.startedAt = new Date();
       await job.save();
 
+      // Add to active jobs
       this.activeJobs.set(job.jobId, job);
 
-      logger.info(`Processing job: ${job.jobId} for file: ${job.fileId}`);
+      logger.info(`Processing job: ${job.jobId} (${this.activeJobs.size}/${this.maxConcurrentJobs} active)`);
 
-      // Emit job start event
-      this.emit('job:start', job);
-
-      // Process with timeout
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Job timeout - exceeded maximum processing time')), config.queue.jobTimeoutMs);
-      });
-
+      // Process job with timeout
       try {
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Job timeout')), config.queue.jobTimeoutMs);
+        });
+
         await Promise.race([
           this.executeJob(job),
           timeoutPromise
@@ -165,8 +161,15 @@ class JobQueue extends EventEmitter {
     const fileService = require('../file.service');
 
     try {
-      logger.info(`Executing job ${job.jobId} - fetching file from S3 and processing`);
+      // Log memory before processing
+      const memBefore = process.memoryUsage();
+      logger.info(`Executing job ${job.jobId} - Memory before: ${Math.round(memBefore.heapUsed / 1024 / 1024)}MB / ${Math.round(memBefore.heapTotal / 1024 / 1024)}MB`);
+      
       const result = await fileService.processFile(job.fileId);
+
+      // Log memory after processing
+      const memAfter = process.memoryUsage();
+      logger.info(`Job completed: ${job.jobId} - Processed ${result.processed} records - Memory after: ${Math.round(memAfter.heapUsed / 1024 / 1024)}MB / ${Math.round(memAfter.heapTotal / 1024 / 1024)}MB`);
 
       // Mark as completed
       job.status = 'completed';
@@ -174,7 +177,6 @@ class JobQueue extends EventEmitter {
       job.result = result;
       await job.save();
 
-      logger.info(`Job completed: ${job.jobId} - Processed ${result.processed} records`);
       this.emit('job:complete', job);
     } catch (error) {
       logger.error(`Job execution failed for ${job.jobId}:`, {
@@ -247,39 +249,19 @@ class JobQueue extends EventEmitter {
       jobId: job.jobId,
       fileId: job.fileId,
       status: job.status,
+      priority: job.priority,
       attempts: job.attempts,
       maxAttempts: job.maxAttempts,
-      result: job.result,
-      error: job.error,
       createdAt: job.createdAt,
       startedAt: job.startedAt,
-      completedAt: job.completedAt
+      completedAt: job.completedAt,
+      result: job.result,
+      error: job.error
     };
   }
 
   /**
-   * Get queue statistics
-   */
-  async getStats() {
-    const [pending, processing, completed, failed] = await Promise.all([
-      Job.countDocuments({ status: 'pending' }),
-      Job.countDocuments({ status: 'processing' }),
-      Job.countDocuments({ status: 'completed' }),
-      Job.countDocuments({ status: 'failed' })
-    ]);
-
-    return {
-      pending,
-      processing,
-      completed,
-      failed,
-      active: this.activeJobs.size,
-      maxConcurrent: this.maxConcurrentJobs
-    };
-  }
-
-  /**
-   * List jobs with filters
+   * List jobs with filtering and pagination
    */
   async listJobs(status = null, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
@@ -306,26 +288,63 @@ class JobQueue extends EventEmitter {
   }
 
   /**
-   * Graceful shutdown
+   * Get queue statistics
+   */
+  async getStats() {
+    const [pending, processing, completed, failed] = await Promise.all([
+      Job.countDocuments({ status: 'pending' }),
+      Job.countDocuments({ status: 'processing' }),
+      Job.countDocuments({ status: 'completed' }),
+      Job.countDocuments({ status: 'failed' })
+    ]);
+
+    return {
+      pending,
+      processing,
+      completed,
+      failed,
+      active: this.activeJobs.size,
+      maxConcurrent: this.maxConcurrentJobs
+    };
+  }
+
+  /**
+   * Shutdown queue gracefully
    */
   async shutdown() {
     logger.info('Shutting down job queue...');
+    
     this.stopProcessing();
 
-    // Wait for active jobs to complete (with timeout)
-    const shutdownTimeout = 30000; // 30 seconds
+    // Wait for active jobs to complete (max 30 seconds)
+    const maxWaitTime = 30000;
     const startTime = Date.now();
 
-    while (this.activeJobs.size > 0 && Date.now() - startTime < shutdownTimeout) {
+    while (this.activeJobs.size > 0 && Date.now() - startTime < maxWaitTime) {
       logger.info(`Waiting for ${this.activeJobs.size} active jobs to complete...`);
       await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     if (this.activeJobs.size > 0) {
-      logger.warn(`Forcing shutdown with ${this.activeJobs.size} active jobs`);
-    } else {
-      logger.info('All jobs completed. Queue shutdown complete.');
+      logger.warn(`Forcing shutdown with ${this.activeJobs.size} active jobs remaining`);
+      
+      // Mark remaining active jobs as pending so they can be restarted
+      for (const [jobId, job] of this.activeJobs) {
+        try {
+          await Job.updateOne(
+            { jobId },
+            { status: 'pending', startedAt: null }
+          );
+          logger.info(`Reset job to pending: ${jobId}`);
+        } catch (error) {
+          logger.error(`Failed to reset job ${jobId}:`, error);
+        }
+      }
+      
+      this.activeJobs.clear();
     }
+
+    logger.info('Job queue shutdown complete');
   }
 }
 

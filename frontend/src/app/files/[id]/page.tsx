@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { File as FileType, FileData } from '@/types';
 import { getFile, getFileData, processFile } from '@/services/api';
@@ -23,16 +23,23 @@ export default function FileDetailPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const fetchFileDetails = async () => {
+  const fetchFileDetails = useCallback(async () => {
     try {
       const fileDetails = await getFile(fileId);
       setFile(fileDetails);
+      
+      // If processing, keep polling
+      if (fileDetails.status === 'processing') {
+        setProcessing(true);
+      } else {
+        setProcessing(false);
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to load file');
     } finally {
       setLoading(false);
     }
-  };
+  }, [fileId]);
 
   const fetchFileData = async () => {
     if (!file || file.status !== 'processed') return;
@@ -49,9 +56,23 @@ export default function FileDetailPage() {
     }
   };
 
+  // Initial load
   useEffect(() => {
     fetchFileDetails();
-  }, [fileId]);
+  }, [fetchFileDetails]);
+
+  // Poll for status updates when processing
+  useEffect(() => {
+    if (!file) return;
+    
+    if (file.status === 'processing') {
+      const pollInterval = setInterval(() => {
+        fetchFileDetails();
+      }, 3000); // Poll every 3 seconds
+
+      return () => clearInterval(pollInterval);
+    }
+  }, [file?.status, fetchFileDetails]);
 
   useEffect(() => {
     if (file) {
@@ -64,10 +85,16 @@ export default function FileDetailPage() {
     try {
       const job = await processFile(fileId);
       toast.success(`Processing started! Job ID: ${job.jobId}`);
+      
+      // Optimistically update status
+      if (file) {
+        setFile({ ...file, status: 'processing' });
+      }
+      
+      // Start polling immediately
       setTimeout(fetchFileDetails, 2000);
     } catch (error: any) {
       toast.error(error.message || 'Failed to start processing');
-    } finally {
       setProcessing(false);
     }
   };
@@ -120,14 +147,24 @@ export default function FileDetailPage() {
               </div>
             </div>
             
-            {file.status === 'uploaded' && (
+            {file.status === 'uploaded' && !processing && (
               <button
                 onClick={handleProcess}
                 disabled={processing}
                 className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
               >
                 <Play className="w-4 h-4" />
-                <span>{processing ? 'Processing...' : 'Process File'}</span>
+                <span>Process File</span>
+              </button>
+            )}
+
+            {processing && file.status !== 'processed' && file.status !== 'failed' && (
+              <button
+                disabled
+                className="flex items-center space-x-2 bg-gray-400 text-white px-4 py-2 rounded-lg cursor-not-allowed"
+              >
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <span>Processing...</span>
               </button>
             )}
           </div>
@@ -162,6 +199,14 @@ export default function FileDetailPage() {
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
             <p className="text-red-900 font-medium">Processing failed</p>
             <p className="text-red-700 text-sm mt-1">Please try processing again or contact support</p>
+            <button
+              onClick={handleProcess}
+              disabled={processing}
+              className="mt-4 flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-colors mx-auto"
+            >
+              <Play className="w-4 h-4" />
+              <span>Retry Processing</span>
+            </button>
           </div>
         )}
 

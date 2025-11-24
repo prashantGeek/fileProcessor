@@ -20,7 +20,7 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">File Processing Dashboard</h1>
-          <p className="text-gray-600">Upload and process your files with ease</p>
+          <p className="text-gray-600">Upload and process your text files with ease</p>
         </div>
 
         <div className="mb-8">
@@ -38,7 +38,7 @@ export default function Home() {
               <ol className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">1.</span>
-                  Upload your file (.txt, .csv, .log, .json)
+                  Upload your .txt file (max 10MB)
                 </li>
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">2.</span>
@@ -46,7 +46,7 @@ export default function Home() {
                 </li>
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">3.</span>
-                  Click "Process" to start processing
+                  Click "Process" to parse line by line
                 </li>
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">4.</span>

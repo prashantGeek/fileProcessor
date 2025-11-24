@@ -4,8 +4,8 @@
   "description": "Production-level file processing backend with job queue",
   "main": "src/server.js",
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "start": "node --max-old-space-size=4096 src/server.js",
+    "dev": "nodemon --max-old-space-size=4096 src/server.js",
     "test": "jest --coverage",
     "lint": "eslint src/**/*.js"
   },

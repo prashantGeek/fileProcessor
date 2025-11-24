@@ -1,15 +1,34 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Upload, FileText, X } from 'lucide-react';
+import { Upload, FileText, X, AlertCircle } from 'lucide-react';
 import { uploadFile } from '@/services/api';
 import { formatBytes } from '@/lib/utils';
 import toast from 'react-hot-toast';
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ['.txt'];
 
 export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const validateFile = (file: File): string | null => {
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      return `File size exceeds ${formatBytes(MAX_FILE_SIZE)} limit`;
+    }
+
+    // Check file type
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+    if (!ALLOWED_TYPES.includes(ext)) {
+      return `Only .txt files are allowed`;
+    }
+
+    return null;
+  };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -28,27 +47,62 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
 
     const files = e.dataTransfer.files;
     if (files && files[0]) {
-      setSelectedFile(files[0]);
+      const error = validateFile(files[0]);
+      if (error) {
+        setValidationError(error);
+        toast.error(error);
+        setSelectedFile(null);
+      } else {
+        setValidationError(null);
+        setSelectedFile(files[0]);
+      }
     }
   }, []);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      const error = validateFile(file);
+      if (error) {
+        setValidationError(error);
+        toast.error(error);
+        setSelectedFile(null);
+        e.target.value = ''; // Reset input
+      } else {
+        setValidationError(null);
+        setSelectedFile(file);
+      }
     }
   };
 
   const handleUpload = async () => {
     if (!selectedFile) return;
 
+    // Double-check validation
+    const error = validateFile(selectedFile);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+
     setUploading(true);
     try {
       await uploadFile(selectedFile);
       toast.success('File uploaded successfully!');
       setSelectedFile(null);
+      setValidationError(null);
       if (onUploadSuccess) onUploadSuccess();
     } catch (error: any) {
-      toast.error(error.message || 'Upload failed');
+      console.error('Upload error:', error);
+      
+      // Handle specific errors
+      if (error.message?.includes('File too large') || error.message?.includes('LIMIT_FILE_SIZE')) {
+        toast.error(`File too large. Maximum size: ${formatBytes(MAX_FILE_SIZE)}`);
+      } else if (error.message?.includes('rate limit')) {
+        toast.error('Too many uploads. Please wait a moment and try again.');
+      } else {
+        toast.error(error.message || 'Upload failed. Please try again.');
+      }
     } finally {
       setUploading(false);
     }
@@ -60,6 +114,8 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
         className={`relative border-2 border-dashed rounded-lg p-8 transition-colors ${
           isDragging
             ? 'border-blue-500 bg-blue-50'
+            : validationError
+            ? 'border-red-300 bg-red-50'
             : 'border-gray-300 hover:border-gray-400'
         }`}
         onDragEnter={handleDrag}
@@ -72,7 +128,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
           id="file-upload"
           className="hidden"
           onChange={handleFileSelect}
-          accept=".txt,.csv,.log,.json,.jsonl"
+          accept=".txt"
         />
 
         {!selectedFile ? (
@@ -80,12 +136,12 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
             htmlFor="file-upload"
             className="flex flex-col items-center justify-center cursor-pointer"
           >
-            <Upload className="w-12 h-12 text-gray-400 mb-4" />
+            <Upload className={`w-12 h-12 mb-4 ${validationError ? 'text-red-400' : 'text-gray-400'}`} />
             <p className="text-lg font-medium text-gray-700 mb-2">
-              Drop your file here or click to browse
+              Drop your .txt file here or click to browse
             </p>
             <p className="text-sm text-gray-500">
-              Supported: .txt, .csv, .log, .json (max 1GB)
+              Only .txt files allowed (max {formatBytes(MAX_FILE_SIZE)})
             </p>
           </label>
         ) : (
@@ -98,7 +154,10 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
               </div>
             </div>
             <button
-              onClick={() => setSelectedFile(null)}
+              onClick={() => {
+                setSelectedFile(null);
+                setValidationError(null);
+              }}
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="w-5 h-5" />
@@ -107,7 +166,14 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
         )}
       </div>
 
-      {selectedFile && (
+      {validationError && (
+        <div className="mt-3 flex items-center space-x-2 text-red-600 text-sm">
+          <AlertCircle className="w-4 h-4" />
+          <span>{validationError}</span>
+        </div>
+      )}
+
+      {selectedFile && !validationError && (
         <button
           onClick={handleUpload}
           disabled={uploading}

@@ -3,7 +3,7 @@ const readline = require('readline');
 const logger = require('./logger');
 
 class StreamProcessor {
-  constructor(batchSize = 1000, batchTimeoutMs = 5000) {
+  constructor(batchSize = 500, batchTimeoutMs = 5000) {
     this.batchSize = batchSize;
     this.batchTimeoutMs = batchTimeoutMs;
   }
@@ -25,31 +25,44 @@ class StreamProcessor {
 
     const rl = readline.createInterface({
       input: stream,
-      crlfDelay: Infinity
+      crlfDelay: Infinity,
+      terminal: false
     });
 
     const flushBatch = async () => {
       if (batch.length === 0) return;
 
+      const currentBatch = batch;
+      const batchLength = currentBatch.length;
+      
+      // Clear batch array immediately to free memory
+      batch = [];
+      
       try {
-        await batchProcessor(batch);
-        processedCount += batch.length;
-        logger.info(`Processed batch of ${batch.length} records. Total: ${processedCount}`);
+        await batchProcessor(currentBatch);
+        processedCount += batchLength;
+        logger.info(`Processed batch of ${batchLength} records. Total: ${processedCount}`);
       } catch (error) {
-        failedCount += batch.length;
+        failedCount += batchLength;
         logger.error(`Batch processing failed:`, error);
         errors.push({
           type: 'batch_error',
           message: error.message,
-          batchSize: batch.length
+          batchSize: batchLength
         });
       }
 
-      batch = [];
+      // Clear the batch reference
+      currentBatch.length = 0;
       
       if (batchTimer) {
         clearTimeout(batchTimer);
         batchTimer = null;
+      }
+
+      // Hint to GC
+      if (global.gc) {
+        global.gc();
       }
     };
 
@@ -89,11 +102,15 @@ class StreamProcessor {
         } catch (error) {
           failedCount++;
           logger.warn(`Failed to parse line ${lineNumber}: ${error.message}`);
-          errors.push({
-            line: lineNumber,
-            content: line.substring(0, 100),
-            error: error.message
-          });
+          
+          // Only keep limited error details
+          if (errors.length < 100) {
+            errors.push({
+              line: lineNumber,
+              content: line.substring(0, 100),
+              error: error.message
+            });
+          }
         }
       });
 
@@ -101,6 +118,12 @@ class StreamProcessor {
         try {
           // Flush remaining batch
           await flushBatch();
+          
+          // Clean up
+          if (batchTimer) {
+            clearTimeout(batchTimer);
+          }
+          rl.removeAllListeners();
           
           logger.info(`Stream processing completed. Processed: ${processedCount}, Failed: ${failedCount}`);
           
@@ -116,6 +139,10 @@ class StreamProcessor {
 
       rl.on('error', (error) => {
         logger.error('Stream reading error:', error);
+        if (batchTimer) {
+          clearTimeout(batchTimer);
+        }
+        rl.removeAllListeners();
         reject(error);
       });
     });
