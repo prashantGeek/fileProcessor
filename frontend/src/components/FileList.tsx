@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { File as FileType } from '@/types';
 import { getFiles } from '@/services/api';
 import FileCard from './FileCard';
-import { RefreshCw } from 'lucide-react';
+import { RefreshCw, AlertCircle } from 'lucide-react';
 
 interface FileListProps {
   refreshTrigger?: number;
@@ -13,6 +13,7 @@ interface FileListProps {
 export default function FileList({ refreshTrigger }: FileListProps) {
   const [files, setFiles] = useState<FileType[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
@@ -20,11 +21,13 @@ export default function FileList({ refreshTrigger }: FileListProps) {
   const fetchFiles = async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await getFiles(page, 20, statusFilter || undefined);
       setFiles(response.files);
       setTotalPages(response.pagination.pages);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch files:', error);
+      setError(error.message || 'Failed to load files');
     } finally {
       setLoading(false);
     }
@@ -69,12 +72,28 @@ export default function FileList({ refreshTrigger }: FileListProps) {
         </div>
       </div>
 
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4 flex items-center space-x-3">
+          <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="text-red-900 font-medium">Error loading files</p>
+            <p className="text-red-700 text-sm">{error}</p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="text-red-600 hover:text-red-800 text-sm font-medium"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       {loading && files.length === 0 ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="text-gray-500 mt-4">Loading files...</p>
         </div>
-      ) : files.length === 0 ? (
+      ) : files.length === 0 && !error ? (
         <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
           <p className="text-gray-500">No files uploaded yet</p>
           <p className="text-sm text-gray-400 mt-1">Upload your first file to get started</p>

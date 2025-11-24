@@ -124,14 +124,14 @@ class JobQueue extends EventEmitter {
 
       this.activeJobs.set(job.jobId, job);
 
-      logger.info(`Processing job: ${job.jobId}`);
+      logger.info(`Processing job: ${job.jobId} for file: ${job.fileId}`);
 
       // Emit job start event
       this.emit('job:start', job);
 
       // Process with timeout
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Job timeout')), config.queue.jobTimeoutMs);
+        setTimeout(() => reject(new Error('Job timeout - exceeded maximum processing time')), config.queue.jobTimeoutMs);
       });
 
       try {
@@ -140,15 +140,21 @@ class JobQueue extends EventEmitter {
           timeoutPromise
         ]);
       } catch (error) {
+        logger.error(`Job execution error for ${job.jobId}:`, {
+          message: error.message,
+          fileId: job.fileId
+        });
         await this.handleJobError(job, error);
       } finally {
         this.activeJobs.delete(job.jobId);
         
-        // Process next job
+        // Process next job immediately
         setImmediate(() => this.processNext());
       }
     } catch (error) {
       logger.error('Process next error:', error);
+      // Don't let errors stop the queue - retry after delay
+      setTimeout(() => this.processNext(), 2000);
     }
   }
 
@@ -159,6 +165,7 @@ class JobQueue extends EventEmitter {
     const fileService = require('../file.service');
 
     try {
+      logger.info(`Executing job ${job.jobId} - fetching file from S3 and processing`);
       const result = await fileService.processFile(job.fileId);
 
       // Mark as completed
@@ -167,9 +174,13 @@ class JobQueue extends EventEmitter {
       job.result = result;
       await job.save();
 
-      logger.info(`Job completed: ${job.jobId}`);
+      logger.info(`Job completed: ${job.jobId} - Processed ${result.processed} records`);
       this.emit('job:complete', job);
     } catch (error) {
+      logger.error(`Job execution failed for ${job.jobId}:`, {
+        message: error.message,
+        stack: error.stack
+      });
       throw error;
     }
   }
@@ -179,6 +190,16 @@ class JobQueue extends EventEmitter {
    */
   async handleJobError(job, error) {
     job.attempts += 1;
+    
+    // Log detailed error information
+    logger.error(`Job error details for ${job.jobId}:`, {
+      message: error.message,
+      stack: error.stack,
+      fileId: job.fileId,
+      attempt: job.attempts,
+      maxAttempts: job.maxAttempts
+    });
+    
     job.error = {
       message: error.message,
       stack: error.stack,
@@ -188,11 +209,24 @@ class JobQueue extends EventEmitter {
     if (job.attempts >= job.maxAttempts) {
       job.status = 'failed';
       job.completedAt = new Date();
-      logger.error(`Job failed after ${job.attempts} attempts: ${job.jobId}`);
+      logger.error(`Job failed permanently after ${job.attempts} attempts: ${job.jobId} - Error: ${error.message}`);
+      
+      // Mark file as failed too
+      try {
+        const File = require('../../models/file.model');
+        await File.updateOne(
+          { fileId: job.fileId },
+          { status: 'failed' }
+        );
+        logger.info(`Marked file ${job.fileId} as failed`);
+      } catch (fileUpdateError) {
+        logger.error('Failed to update file status:', fileUpdateError);
+      }
+      
       this.emit('job:failed', job);
     } else {
       job.status = 'pending';
-      logger.warn(`Job failed (attempt ${job.attempts}/${job.maxAttempts}): ${job.jobId}`);
+      logger.warn(`Job failed (attempt ${job.attempts}/${job.maxAttempts}): ${job.jobId} - Will retry. Error: ${error.message}`);
       this.emit('job:retry', job);
     }
 
