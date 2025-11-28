@@ -102,9 +102,15 @@ export default function JobsPage() {
                         <ProcessingStatus status={job.status} />
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {job.result ? (
+                        {job.status === 'completed' && job.result ? (
                           <span className="text-green-600">{job.result.processed} processed</span>
-                        ) : '-'}
+                        ) : job.status === 'processing' ? (
+                          <span className="text-yellow-600">In progress...</span>
+                        ) : job.status === 'failed' ? (
+                          <span className="text-red-600">Failed</span>
+                        ) : (
+                          <span className="text-gray-400">Pending</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
                         {formatDate(job.createdAt)}
