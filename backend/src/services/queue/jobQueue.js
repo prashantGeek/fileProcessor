@@ -1,5 +1,6 @@
 const EventEmitter = require('events');
 const Job = require('../../models/job.model');
+const File = require('../../models/file.model');
 const logger = require('../../utils/logger');
 const config = require('../../config/server.config');
 
@@ -291,8 +292,6 @@ class JobQueue extends EventEmitter {
    * Get queue statistics
    */
   async getStats() {
-    const File = require('../../models/file.model');
-    
     const [pending, processing, completed, failed, uploaded, fileProcessing, processed, fileFailed] = await Promise.all([
       Job.countDocuments({ status: 'pending' }),
       Job.countDocuments({ status: 'processing' }),
