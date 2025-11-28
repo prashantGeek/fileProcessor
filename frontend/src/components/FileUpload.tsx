@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Upload, FileText, X, AlertCircle } from 'lucide-react';
 import { uploadFile } from '@/services/api';
 import { formatBytes } from '@/lib/utils';
@@ -14,20 +14,31 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const validateFile = (file: File): string | null => {
-    // Check file size
     if (file.size > MAX_FILE_SIZE) {
       return `File size exceeds ${formatBytes(MAX_FILE_SIZE)} limit`;
     }
 
-    // Check file type
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!ALLOWED_TYPES.includes(ext)) {
       return `Only .txt files are allowed`;
     }
 
     return null;
+  };
+
+  const resetFileInput = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCancel = () => {
+    setSelectedFile(null);
+    setValidationError(null);
+    resetFileInput();
   };
 
   const handleDrag = useCallback((e: React.DragEvent) => {
@@ -44,6 +55,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    resetFileInput();
 
     const files = e.dataTransfer.files;
     if (files && files[0]) {
@@ -67,7 +79,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
         setValidationError(error);
         toast.error(error);
         setSelectedFile(null);
-        e.target.value = ''; // Reset input
+        e.target.value = '';
       } else {
         setValidationError(null);
         setSelectedFile(file);
@@ -78,7 +90,6 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
   const handleUpload = async () => {
     if (!selectedFile) return;
 
-    // Double-check validation
     const error = validateFile(selectedFile);
     if (error) {
       toast.error(error);
@@ -91,11 +102,11 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
       toast.success('File uploaded successfully!');
       setSelectedFile(null);
       setValidationError(null);
+      resetFileInput();
       if (onUploadSuccess) onUploadSuccess();
     } catch (error: any) {
       console.error('Upload error:', error);
       
-      // Handle specific errors
       if (error.message?.includes('File too large') || error.message?.includes('LIMIT_FILE_SIZE')) {
         toast.error(`File too large. Maximum size: ${formatBytes(MAX_FILE_SIZE)}`);
       } else if (error.message?.includes('rate limit')) {
@@ -124,6 +135,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
         onDrop={handleDrop}
       >
         <input
+          ref={fileInputRef}
           type="file"
           id="file-upload"
           className="hidden"
@@ -154,10 +166,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
               </div>
             </div>
             <button
-              onClick={() => {
-                setSelectedFile(null);
-                setValidationError(null);
-              }}
+              onClick={handleCancel}
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="w-5 h-5" />
