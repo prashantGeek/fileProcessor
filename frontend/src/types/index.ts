@@ -51,6 +51,12 @@ export interface QueueStats {
   failed: number;
   active: number;
   maxConcurrent: number;
+  files?: {
+    uploaded: number;
+    processing: number;
+    processed: number;
+    failed: number;
+  };
 }
 
 export interface ApiResponse<T> {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { QueueStats as QueueStatsType } from '@/types';
 import { getQueueStats } from '@/services/api';
-import { Activity, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { Activity, CheckCircle, Clock, XCircle, FileUp } from 'lucide-react';
 
 export default function QueueStats() {
   const [stats, setStats] = useState<QueueStatsType | null>(null);
@@ -41,29 +41,33 @@ export default function QueueStats() {
 
   const statCards = [
     {
-      label: 'Pending',
-      value: stats.pending,
-      icon: Clock,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-50',
+      label: 'Uploaded',
+      value: stats.files?.uploaded || 0,
+      description: 'Waiting to process',
+      icon: FileUp,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
     },
     {
       label: 'Processing',
-      value: stats.processing,
+      value: stats.files?.processing || 0,
+      description: 'Currently processing',
       icon: Activity,
       color: 'text-blue-600',
       bgColor: 'bg-blue-50',
     },
     {
-      label: 'Completed',
-      value: stats.completed,
+      label: 'Processed',
+      value: stats.files?.processed || 0,
+      description: 'Successfully completed',
       icon: CheckCircle,
       color: 'text-green-600',
       bgColor: 'bg-green-50',
     },
     {
       label: 'Failed',
-      value: stats.failed,
+      value: stats.files?.failed || 0,
+      description: 'Failed to process',
       icon: XCircle,
       color: 'text-red-600',
       bgColor: 'bg-red-50',
@@ -83,6 +87,7 @@ export default function QueueStats() {
               <div>
                 <p className="text-sm text-gray-600 font-medium">{stat.label}</p>
                 <p className="text-3xl font-bold text-gray-900 mt-1">{stat.value}</p>
+                <p className="text-xs text-gray-500 mt-1">{stat.description}</p>
               </div>
               <div className={`${stat.bgColor} p-3 rounded-full`}>
                 <Icon className={`w-6 h-6 ${stat.color}`} />

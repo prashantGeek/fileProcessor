@@ -291,11 +291,17 @@ class JobQueue extends EventEmitter {
    * Get queue statistics
    */
   async getStats() {
-    const [pending, processing, completed, failed] = await Promise.all([
+    const File = require('../../models/file.model');
+    
+    const [pending, processing, completed, failed, uploaded, fileProcessing, processed, fileFailed] = await Promise.all([
       Job.countDocuments({ status: 'pending' }),
       Job.countDocuments({ status: 'processing' }),
       Job.countDocuments({ status: 'completed' }),
-      Job.countDocuments({ status: 'failed' })
+      Job.countDocuments({ status: 'failed' }),
+      File.countDocuments({ status: 'uploaded' }),
+      File.countDocuments({ status: 'processing' }),
+      File.countDocuments({ status: 'processed' }),
+      File.countDocuments({ status: 'failed' })
     ]);
 
     return {
@@ -304,7 +310,13 @@ class JobQueue extends EventEmitter {
       completed,
       failed,
       active: this.activeJobs.size,
-      maxConcurrent: this.maxConcurrentJobs
+      maxConcurrent: this.maxConcurrentJobs,
+      files: {
+        uploaded,
+        processing: fileProcessing,
+        processed,
+        failed: fileFailed
+      }
     };
   }
 
