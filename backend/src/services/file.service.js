@@ -152,6 +152,8 @@ class FileService {
       case 'json':
       case 'jsonl':
         return this.streamProcessor.parseJSONLine.bind(this.streamProcessor);
+      case 'log':
+      case 'txt':
       default:
         return this.streamProcessor.parseTextLine.bind(this.streamProcessor);
     }

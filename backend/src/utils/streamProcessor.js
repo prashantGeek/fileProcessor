@@ -149,10 +149,10 @@ class StreamProcessor {
   }
 
   /**
-   * Parse CSV line
+   * Parse CSV line - handles quoted fields with commas
    */
   parseCSVLine(line, lineNumber) {
-    const values = line.split(',').map(v => v.trim());
+    const values = this.parseCSVValues(line);
     
     if (values.length === 0) {
       throw new Error('Empty line');
@@ -163,6 +163,39 @@ class StreamProcessor {
       data: values,
       timestamp: new Date()
     };
+  }
+
+  /**
+   * Parse CSV values handling quoted fields
+   */
+  parseCSVValues(line) {
+    const values = [];
+    let current = '';
+    let inQuotes = false;
+    
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      
+      if (char === '"') {
+        // Check for escaped quote
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"';
+          i++; // Skip next quote
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        values.push(current.trim());
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    
+    // Don't forget the last value
+    values.push(current.trim());
+    
+    return values;
   }
 
   /**
