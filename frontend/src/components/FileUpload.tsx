@@ -6,7 +6,8 @@ import { uploadFile } from '@/services/api';
 import { formatBytes } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+// Render free tier has ~5-10MB request body limit
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB (Render free tier limit)
 const ALLOWED_TYPES = ['.txt', '.csv', '.log'];
 
 export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () => void }) {

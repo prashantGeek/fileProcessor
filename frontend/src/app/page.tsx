@@ -38,7 +38,7 @@ export default function Home() {
               <ol className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">1.</span>
-                  Upload your file (max 100MB)
+                  Upload your file (max 5MB on free tier)
                 </li>
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">2.</span>
