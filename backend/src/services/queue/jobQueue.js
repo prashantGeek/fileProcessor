@@ -10,6 +10,7 @@ class JobQueue extends EventEmitter {
     this.activeJobs = new Map();
     this.maxConcurrentJobs = config.queue.maxConcurrentJobs;
     this.processing = false;
+    this.degradedMode = false; // True when MongoDB quota is exceeded
   }
 
   /**
@@ -25,14 +26,23 @@ class JobQueue extends EventEmitter {
       // Mark stuck jobs as FAILED (not pending) to prevent crash loops
       // They were likely causing OOM issues
       for (const job of stuckJobs) {
-        job.status = 'failed';
-        job.error = {
-          message: 'Job was interrupted by server restart - marked as failed to prevent crash loop',
-          timestamp: new Date()
-        };
-        job.completedAt = new Date();
-        await job.save();
-        logger.warn(`Marked stuck job as failed: ${job.jobId}`);
+        try {
+          job.status = 'failed';
+          job.error = {
+            message: 'Job was interrupted by server restart - marked as failed to prevent crash loop',
+            timestamp: new Date()
+          };
+          job.completedAt = new Date();
+          await job.save();
+          logger.warn(`Marked stuck job as failed: ${job.jobId}`);
+        } catch (saveError) {
+          // If we can't save due to quota, just log and continue
+          if (this.isQuotaError(saveError)) {
+            logger.warn(`Cannot update stuck job ${job.jobId} - database quota exceeded`);
+          } else {
+            throw saveError;
+          }
+        }
       }
 
       logger.info('Job queue initialized');
@@ -42,15 +52,45 @@ class JobQueue extends EventEmitter {
         this.startProcessing();
       }, 5000);
     } catch (error) {
+      // Check if this is a quota error - if so, start in degraded mode
+      if (this.isQuotaError(error)) {
+        logger.warn('MongoDB quota exceeded - starting in degraded mode (read-only)');
+        logger.warn('Please free up MongoDB storage or upgrade your plan');
+        this.degradedMode = true;
+        
+        // Still start processing loop to handle reads/status checks
+        setTimeout(() => {
+          this.startProcessing();
+        }, 5000);
+        return; // Don't throw - allow server to start
+      }
+      
       logger.error('Job queue initialization error:', error);
       throw error;
     }
   }
 
   /**
+   * Check if error is a MongoDB quota error
+   */
+  isQuotaError(error) {
+    return error && (
+      (error.code === 8000 && error.codeName === 'AtlasError') ||
+      (error.message && error.message.includes('space quota'))
+    );
+  }
+
+  /**
    * Add job to queue
    */
   async addJob(fileId, priority = 0) {
+    // Check if in degraded mode
+    if (this.degradedMode) {
+      const error = new Error('Service temporarily unavailable - database storage quota exceeded. Please try again later.');
+      error.statusCode = 503;
+      throw error;
+    }
+
     try {
       const jobId = `job-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       
@@ -76,6 +116,13 @@ class JobQueue extends EventEmitter {
         createdAt: job.createdAt
       };
     } catch (error) {
+      // Check for quota error and update degraded mode
+      if (this.isQuotaError(error)) {
+        this.degradedMode = true;
+        const quotaError = new Error('Service temporarily unavailable - database storage quota exceeded. Please try again later.');
+        quotaError.statusCode = 503;
+        throw quotaError;
+      }
       logger.error('Add job error:', error);
       throw error;
     }
@@ -320,6 +367,7 @@ class JobQueue extends EventEmitter {
       failed,
       active: this.activeJobs.size,
       maxConcurrent: this.maxConcurrentJobs,
+      degradedMode: this.degradedMode,
       files: {
         uploaded,
         processing: fileProcessing,
