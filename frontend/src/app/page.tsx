@@ -38,7 +38,7 @@ export default function Home() {
               <ol className="space-y-2 text-sm text-gray-600">
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">1.</span>
-                  Upload your .txt file (max 10MB)
+                  Upload your file (max 100MB)
                 </li>
                 <li className="flex items-start">
                   <span className="font-semibold text-blue-600 mr-2">2.</span>
