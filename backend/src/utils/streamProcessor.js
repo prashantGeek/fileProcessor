@@ -3,9 +3,22 @@ const readline = require('readline');
 const logger = require('./logger');
 
 class StreamProcessor {
-  constructor(batchSize = 500, batchTimeoutMs = 5000) {
+  constructor(batchSize = 100, batchTimeoutMs = 3000) {
     this.batchSize = batchSize;
     this.batchTimeoutMs = batchTimeoutMs;
+  }
+
+  /**
+   * Force garbage collection if available
+   */
+  tryGC() {
+    if (global.gc) {
+      try {
+        global.gc();
+      } catch (e) {
+        // Ignore GC errors
+      }
+    }
   }
 
   /**
@@ -60,10 +73,8 @@ class StreamProcessor {
         batchTimer = null;
       }
 
-      // Hint to GC
-      if (global.gc) {
-        global.gc();
-      }
+      // Force GC after each batch
+      this.tryGC();
     };
 
     const scheduleBatchFlush = () => {
