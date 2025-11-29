@@ -6,9 +6,8 @@ import { uploadFile } from '@/services/api';
 import { formatBytes } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
-// Render free tier has ~5-10MB request body limit
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB (Render free tier limit)
-const ALLOWED_TYPES = ['.txt', '.csv', '.log'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const ALLOWED_TYPES = ['.txt'];
 
 export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () => void }) {
   const [isDragging, setIsDragging] = useState(false);
@@ -24,7 +23,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
 
     const ext = '.' + file.name.split('.').pop()?.toLowerCase();
     if (!ALLOWED_TYPES.includes(ext)) {
-      return `Only ${ALLOWED_TYPES.join(', ')} files are allowed`;
+      return `Only .txt files are allowed`;
     }
 
     return null;
@@ -141,7 +140,7 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
           id="file-upload"
           className="hidden"
           onChange={handleFileSelect}
-          accept=".txt,.csv,.log"
+          accept=".txt"
         />
 
         {!selectedFile ? (
@@ -151,10 +150,10 @@ export default function FileUpload({ onUploadSuccess }: { onUploadSuccess?: () =
           >
             <Upload className={`w-12 h-12 mb-4 ${validationError ? 'text-red-400' : 'text-gray-400'}`} />
             <p className="text-lg font-medium text-gray-700 mb-2">
-              Drop your file here or click to browse
+              Drop your .txt file here or click to browse
             </p>
             <p className="text-sm text-gray-500">
-              Allowed: .txt, .csv, .log (max {formatBytes(MAX_FILE_SIZE)})
+              Only .txt files allowed (max {formatBytes(MAX_FILE_SIZE)})
             </p>
           </label>
         ) : (
