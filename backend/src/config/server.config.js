@@ -7,7 +7,7 @@ module.exports = {
   corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   
   upload: {
-    maxFileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 52428800, // 50MB max for free tier
+    maxFileSize: parseInt(process.env.MAX_FILE_SIZE, 10) || 52428800, 
     allowedFileTypes: (process.env.ALLOWED_FILE_TYPES || '.txt,.csv,.log').split(','),
     tempDir: '/tmp/uploads'
   },
@@ -19,7 +19,7 @@ module.exports = {
   },
   
   batch: {
-    size: parseInt(process.env.BATCH_SIZE, 10) || 100, // Reduced for memory efficiency
+    size: parseInt(process.env.BATCH_SIZE, 10) || 100, 
     timeoutMs: parseInt(process.env.BATCH_TIMEOUT_MS, 10) || 3000
   },
   

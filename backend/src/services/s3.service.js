@@ -7,9 +7,7 @@ class S3Service {
     this.bucket = process.env.S3_BUCKET_NAME;
   }
 
-  /**
-   * Upload file to S3 using stream
-   */
+  //Upload file to S3 using stream
   async uploadFile(fileStream, key, metadata = {}) {
     try {
       const params = {
@@ -36,9 +34,7 @@ class S3Service {
     }
   }
 
-  /**
-   * Get file stream from S3
-   */
+  //Get file stream from S3
   getFileStream(key) {
     try {
       const params = {
@@ -59,9 +55,7 @@ class S3Service {
     }
   }
 
-  /**
-   * Get file metadata
-   */
+  //get file metadata from s3
   async getFileMetadata(key) {
     try {
       const params = {
@@ -83,9 +77,7 @@ class S3Service {
     }
   }
 
-  /**
-   * Delete file from S3
-   */
+  //Delete file from S3
   async deleteFile(key) {
     try {
       const params = {
@@ -101,9 +93,7 @@ class S3Service {
     }
   }
 
-  /**
-   * Check if file exists
-   */
+  //Check if file exists
   async fileExists(key) {
     try {
       await this.getFileMetadata(key);

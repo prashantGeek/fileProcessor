@@ -14,9 +14,8 @@ class FileService {
     );
   }
 
-  /**
-   * Create file record and upload to S3
-   */
+  
+  //Create file record and upload to S3
   async uploadFile(fileStream, originalName, fileSize, mimeType) {
     const fileId = uuidv4();
     const s3Key = `uploads/${fileId}/${originalName}`;
@@ -56,9 +55,8 @@ class FileService {
     }
   }
 
-  /**
-   * Get file by ID
-   */
+  //Get file by ID
+  
   async getFileById(fileId) {
     const file = await File.findOne({ fileId });
     
@@ -69,9 +67,7 @@ class FileService {
     return file;
   }
 
-  /**
-   * Process file: read from S3 and store in MongoDB
-   */
+  //Process file: read from S3 and store in MongoDB
   async processFile(fileId) {
     const file = await this.getFileById(fileId);
 
@@ -84,10 +80,7 @@ class FileService {
     await file.save();
 
     try {
-      // Get file stream from S3
       const fileStream = s3Service.getFileStream(file.s3Key);
-
-      // Determine parser based on file type
       const parser = this.getParserForFile(file.originalName);
 
       // Process stream in batches
@@ -95,7 +88,6 @@ class FileService {
         fileStream,
         parser,
         async (batch) => {
-          // Bulk insert to MongoDB
           await this.saveBatch(fileId, batch);
         }
       );
@@ -117,9 +109,7 @@ class FileService {
     }
   }
 
-  /**
-   * Save batch of parsed data to MongoDB
-   */
+  //Save batch of parsed data to MongoDB
   async saveBatch(fileId, batch) {
     const documents = batch.map(item => ({
       fileId,
@@ -140,9 +130,7 @@ class FileService {
     }
   }
 
-  /**
-   * Get parser based on file extension
-   */
+  //Get parser based on file extension
   getParserForFile(filename) {
     const ext = filename.toLowerCase().split('.').pop();
 
@@ -159,9 +147,7 @@ class FileService {
     }
   }
 
-  /**
-   * Get file data with pagination
-   */
+  //Get file data with pagination
   async getFileData(fileId, page = 1, limit = 100) {
     const skip = (page - 1) * limit;
 
@@ -185,9 +171,7 @@ class FileService {
     };
   }
 
-  /**
-   * List all files with pagination
-   */
+  //List all files with pagination
   async listFiles(page = 1, limit = 20, status = null) {
     const skip = (page - 1) * limit;
     const filter = status ? { status } : {};
@@ -212,9 +196,7 @@ class FileService {
     };
   }
 
-  /**
-   * Delete file and its data
-   */
+  //Delete file and its data
   async deleteFile(fileId) {
     const file = await this.getFileById(fileId);
 

@@ -9,17 +9,13 @@ const logger = require('./utils/logger');
 const jobQueue = require('./services/queue/jobQueue');
 const { errorHandler, notFoundHandler } = require('./middleware/error.middleware');
 
-// Import routes
 const uploadRoutes = require('./routes/upload.routes');
 const processRoutes = require('./routes/process.routes');
 
-// Initialize Express app
 const app = express();
 
-// Trust proxy (important for EC2 behind load balancer)
 app.set('trust proxy', 1);
 
-// Security middleware
 app.use(helmet());
 
 // CORS
@@ -42,7 +38,7 @@ app.use('/api/', limiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Logging middleware
+// Logging
 if (config.env === 'development') {
   app.use(morgan('dev'));
 } else {

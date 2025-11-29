@@ -10,12 +10,11 @@ class JobQueue extends EventEmitter {
     this.activeJobs = new Map();
     this.maxConcurrentJobs = config.queue.maxConcurrentJobs;
     this.processing = false;
-    this.degradedMode = false; // True when MongoDB quota is exceeded
+    this.degradedMode = false; 
   }
 
-  /**
-   * Initialize queue - mark stuck jobs as failed to prevent crash loops
-   */
+  //Initialize queue - mark stuck jobs as failed to prevent crash loops
+  
   async initialize() {
     try {
       // Find jobs that were processing when server stopped
@@ -62,7 +61,7 @@ class JobQueue extends EventEmitter {
         setTimeout(() => {
           this.startProcessing();
         }, 5000);
-        return; // Don't throw - allow server to start
+        return; 
       }
       
       logger.error('Job queue initialization error:', error);
@@ -70,9 +69,7 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Check if error is a MongoDB quota error
-   */
+  //Check if error is a MongoDB quota error
   isQuotaError(error) {
     return error && (
       (error.code === 8000 && error.codeName === 'AtlasError') ||
@@ -80,9 +77,7 @@ class JobQueue extends EventEmitter {
     );
   }
 
-  /**
-   * Add job to queue
-   */
+  //Add job to queue
   async addJob(fileId, priority = 0) {
     // Check if in degraded mode
     if (this.degradedMode) {
@@ -128,9 +123,7 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Start processing loop
-   */
+  //Start processing loop
   startProcessing() {
     if (this.processing) return;
     
@@ -143,9 +136,7 @@ class JobQueue extends EventEmitter {
     }, 2000);
   }
 
-  /**
-   * Stop processing
-   */
+  //Stop processing
   stopProcessing() {
     this.processing = false;
     if (this.processingInterval) {
@@ -154,12 +145,9 @@ class JobQueue extends EventEmitter {
     logger.info('Job queue processing stopped');
   }
 
-  /**
-   * Process next job in queue
-   */
+  //Process next job in queue
   async processNext() {
     try {
-      // Check if we can process more jobs
       if (this.activeJobs.size >= this.maxConcurrentJobs) {
         return;
       }
@@ -212,9 +200,7 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Execute job
-   */
+  //Execute job
   async executeJob(job) {
     const fileService = require('../file.service');
 
@@ -245,9 +231,7 @@ class JobQueue extends EventEmitter {
     }
   }
 
-  /**
-   * Handle job error
-   */
+  //Handle job error
   async handleJobError(job, error) {
     job.attempts += 1;
     
@@ -293,9 +277,7 @@ class JobQueue extends EventEmitter {
     await job.save();
   }
 
-  /**
-   * Get job status
-   */
+  //Get job status
   async getJobStatus(jobId) {
     const job = await Job.findOne({ jobId });
     
@@ -318,9 +300,7 @@ class JobQueue extends EventEmitter {
     };
   }
 
-  /**
-   * List jobs with filtering and pagination
-   */
+  //List jobs with filtering and pagination
   async listJobs(status = null, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const filter = status ? { status } : {};
@@ -345,9 +325,7 @@ class JobQueue extends EventEmitter {
     };
   }
 
-  /**
-   * Get queue statistics
-   */
+  //Get queue statistics
   async getStats() {
     const [pending, processing, completed, failed, uploaded, fileProcessing, processed, fileFailed] = await Promise.all([
       Job.countDocuments({ status: 'pending' }),
@@ -377,9 +355,7 @@ class JobQueue extends EventEmitter {
     };
   }
 
-  /**
-   * Shutdown queue gracefully
-   */
+  //Shutdown queue gracefully
   async shutdown() {
     logger.info('Shutting down job queue...');
     
