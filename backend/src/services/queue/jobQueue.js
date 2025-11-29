@@ -13,7 +13,7 @@ class JobQueue extends EventEmitter {
   }
 
   /**
-   * Initialize queue - restore pending jobs from database
+   * Initialize queue - mark stuck jobs as failed to prevent crash loops
    */
   async initialize() {
     try {
@@ -22,15 +22,25 @@ class JobQueue extends EventEmitter {
         status: 'processing' 
       });
 
-      // Reset stuck jobs to pending
+      // Mark stuck jobs as FAILED (not pending) to prevent crash loops
+      // They were likely causing OOM issues
       for (const job of stuckJobs) {
-        job.status = 'pending';
+        job.status = 'failed';
+        job.error = {
+          message: 'Job was interrupted by server restart - marked as failed to prevent crash loop',
+          timestamp: new Date()
+        };
+        job.completedAt = new Date();
         await job.save();
-        logger.info(`Reset stuck job: ${job.jobId}`);
+        logger.warn(`Marked stuck job as failed: ${job.jobId}`);
       }
 
       logger.info('Job queue initialized');
-      this.startProcessing();
+      
+      // Delay processing start to let server stabilize
+      setTimeout(() => {
+        this.startProcessing();
+      }, 5000);
     } catch (error) {
       logger.error('Job queue initialization error:', error);
       throw error;
